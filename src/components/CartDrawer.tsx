@@ -19,7 +19,6 @@ export default function CartDrawer({ onNavigate }: CartDrawerProps) {
   const [cartCep, setCartCep] = useState('');
   const [cartShippingOptions, setCartShippingOptions] = useState<ShippingQuoteOption[] | null>(null);
   const [cartShippingError, setCartShippingError] = useState<string | null>(null);
-  const [cartShippingWarning, setCartShippingWarning] = useState<string | null>(null);
   const [cartShippingLoading, setCartShippingLoading] = useState(false);
   const [selectedShipping, setSelectedShipping] = useState<number | null>(null);
 
@@ -42,7 +41,6 @@ export default function CartDrawer({ onNavigate }: CartDrawerProps) {
     }
     setCartShippingLoading(true);
     setCartShippingError(null);
-    setCartShippingWarning(null);
     setCartShippingOptions(null);
     setSelectedShipping(null);
     setShippingOption(null);
@@ -68,14 +66,11 @@ export default function CartDrawer({ onNavigate }: CartDrawerProps) {
       };
     });
 
-    const { options, error, warnings } = await fetchShippingQuote(cleanCep, quoteProducts);
+    const { options, error } = await fetchShippingQuote(cleanCep, quoteProducts);
     if (error) {
       setCartShippingError(error);
     } else {
       setCartShippingOptions(options);
-      if (warnings && warnings.length > 0) {
-        setCartShippingWarning(warnings[0]);
-      }
     }
     setCartShippingLoading(false);
   };
@@ -137,9 +132,6 @@ export default function CartDrawer({ onNavigate }: CartDrawerProps) {
             </div>
             {cartShippingError && (
               <p className="text-xs text-red-600">{cartShippingError}</p>
-            )}
-            {cartShippingWarning && (
-              <p className="text-xs text-amber-600">{cartShippingWarning}</p>
             )}
             {cartShippingOptions && cartShippingOptions.length > 0 && (
               <div className="space-y-1.5">

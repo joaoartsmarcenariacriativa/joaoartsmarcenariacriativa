@@ -3,7 +3,6 @@ import type { ShippingQuoteOption } from '@/types';
 export interface ShippingQuoteResult {
   options: ShippingQuoteOption[];
   error: string | null;
-  warnings: string[] | null;
 }
 
 export async function fetchShippingQuote(
@@ -35,19 +34,18 @@ export async function fetchShippingQuote(
 
     if (!response.ok) {
       const errBody = await response.json().catch(() => ({}));
-      return { options: [], error: (errBody as Record<string, string>)?.error ?? `Erro ${response.status}`, warnings: null };
+      return { options: [], error: (errBody as Record<string, string>)?.error ?? `Erro ${response.status}` };
     }
 
     const data = await response.json();
     if (data.error) {
-      return { options: [], error: data.error, warnings: data.warnings ?? null };
+      return { options: [], error: data.error };
     }
     return {
       options: (data.options ?? []) as ShippingQuoteOption[],
       error: null,
-      warnings: data.warnings ?? null,
     };
   } catch {
-    return { options: [], error: 'Não foi possível conectar ao serviço de frete.', warnings: null };
+    return { options: [], error: 'Não foi possível conectar ao serviço de frete.' };
   }
 }

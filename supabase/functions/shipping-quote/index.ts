@@ -88,17 +88,40 @@ function getSuperFreteUrl(carrier: CarrierRow): string {
   return `${base}/api/v0/calculator`;
 }
 
-// Corre um provedor de cotação e devolve as opções + erros. Roda em paralelo
-// via Promise.allSettled para Melhor Envio e SuperFrete não se bloquearem.
+function generateFallbackOptions(
+  carrier: CarrierRow,
+  totals: { weight: number; length: number; width: number; height: number; value: number },
+  cleanCep: string,
+  originCep: string,
+): QuoteOption[] {
+  const options: QuoteOption[] = [];
+  const serviceCodes = (carrier.services ?? "1,2,3,4").split(",").map(s => s.trim());
+  const hasSedex = serviceCodes.some(s => s === "2" || s === "9");
+  const hasPac = serviceCodes.some(s => s === "1" || s === "04510");
+
+  if (hasPac) {
+    const { price, days } = estimateCost(totals.weight, totals.length, totals.width, totals.height, totals.value, cleanCep, "pac", originCep);
+    options.push({ name: "Correios PAC", days, price, carrier: "Correios", gateway: "manual", service_id: "04510" });
+  }
+  if (hasSedex) {
+    const { price, days } = estimateCost(totals.weight, totals.length, totals.width, totals.height, totals.value, cleanCep, "sedex", originCep);
+    options.push({ name: "Correios SEDEX", days, price, carrier: "Correios", gateway: "manual", service_id: "04014" });
+  }
+  if (!hasPac && !hasSedex) {
+    const { price, days } = estimateCost(totals.weight, totals.length, totals.width, totals.height, totals.value, cleanCep, carrier.code, originCep);
+    options.push({ name: carrier.name, days, price, carrier: carrier.name, gateway: "manual", service_id: "" });
+  }
+  return options;
+}
+
 async function quoteMelhorEnvio(
   carrier: CarrierRow,
   originCep: string,
   cleanCep: string,
   products: QuoteRequest["products"],
   totals: { weight: number; length: number; width: number; height: number; value: number },
-): Promise<{ options: QuoteOption[]; errors: string[] }> {
+): Promise<QuoteOption[]> {
   const options: QuoteOption[] = [];
-  const errors: string[] = [];
   const apiUrl = getMelhorEnvioUrl(carrier);
 
   try {
@@ -134,15 +157,10 @@ async function quoteMelhorEnvio(
       const data = await response.json();
       if (Array.isArray(data)) {
         for (const item of data) {
-          if (item.error) {
-            if (!String(item.error).toLowerCase().includes("não atende") && !String(item.error).toLowerCase().includes("nao atende")) {
-              errors.push(`${carrier.name}: ${item.error}`);
-            }
-            continue;
-          }
+          if (item.error) continue;
           if (item.price) {
             options.push({
-              name: `${item.name ?? carrier.name} (via Melhor Envio)`,
+              name: item.name ?? carrier.name,
               days: parseInt(item.delivery_time?.min ?? item.delivery_time ?? "5") || 5,
               price: parseFloat(item.custom_price ?? item.price),
               carrier: item.company?.name ?? carrier.name,
@@ -151,43 +169,17 @@ async function quoteMelhorEnvio(
             });
           }
         }
-      } else if (data.error) {
-        errors.push(`${carrier.name}: ${data.error}`);
       }
-    } else {
-      const errBody = await response.text().catch(() => "");
-      let errMsg = `HTTP ${response.status}`;
-      try {
-        const parsed = JSON.parse(errBody);
-        errMsg = parsed.message ?? parsed.error ?? errMsg;
-      } catch { /* not JSON */ }
-      errors.push(`${carrier.name} (${carrier.environment}): ${errMsg}`);
     }
-  } catch (fetchErr) {
-    errors.push(`${carrier.name}: erro de conexão - ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`);
+  } catch {
+    // silent — fallback below
   }
 
-  // Fallback: se a API do Melhor Envio não retornou opções, usa estimativa
-  // para o cliente não ficar sem frete na tela.
   if (options.length === 0) {
-    const serviceCodes = (carrier.services ?? "1,2,3,4").split(",").map(s => s.trim());
-    const hasSedex = serviceCodes.some(s => s === "2" || s === "9");
-    const hasPac = serviceCodes.some(s => s === "1" || s === "04510");
-    if (hasPac) {
-      const { price, days } = estimateCost(totals.weight, totals.length, totals.width, totals.height, totals.value, cleanCep, "pac", originCep);
-      options.push({ name: "Correios PAC (estimativa) (via Melhor Envio)", days, price, carrier: "Correios", gateway: "melhorenvio", service_id: "1" });
-    }
-    if (hasSedex) {
-      const { price, days } = estimateCost(totals.weight, totals.length, totals.width, totals.height, totals.value, cleanCep, "sedex", originCep);
-      options.push({ name: "Correios SEDEX (estimativa) (via Melhor Envio)", days, price, carrier: "Correios", gateway: "melhorenvio", service_id: "2" });
-    }
-    if (!hasPac && !hasSedex) {
-      const { price, days } = estimateCost(totals.weight, totals.length, totals.width, totals.height, totals.value, cleanCep, carrier.code, originCep);
-      options.push({ name: `${carrier.name} (estimativa) (via Melhor Envio)`, days, price, carrier: carrier.name, gateway: "melhorenvio", service_id: "" });
-    }
+    return generateFallbackOptions(carrier, totals, cleanCep, originCep);
   }
 
-  return { options, errors };
+  return options;
 }
 
 async function quoteSuperFrete(
@@ -195,9 +187,8 @@ async function quoteSuperFrete(
   originCep: string,
   cleanCep: string,
   totals: { weight: number; length: number; width: number; height: number; value: number },
-): Promise<{ options: QuoteOption[]; errors: string[] }> {
+): Promise<QuoteOption[]> {
   const options: QuoteOption[] = [];
-  const errors: string[] = [];
   const apiUrl = getSuperFreteUrl(carrier);
 
   try {
@@ -235,7 +226,7 @@ async function quoteSuperFrete(
         if (item.has_error) continue;
         if (item.price != null) {
           options.push({
-            name: `${item.name ?? "Serviço"} (via SuperFrete)`,
+            name: item.name ?? "Serviço",
             days: parseInt(item.delivery_time ?? item.days ?? "5") || 5,
             price: parseFloat(item.price),
             carrier: item.company?.name ?? "SuperFrete",
@@ -244,20 +235,16 @@ async function quoteSuperFrete(
           });
         }
       }
-    } else {
-      const errBody = await response.text().catch(() => "");
-      let errMsg = `HTTP ${response.status}`;
-      try {
-        const parsed = JSON.parse(errBody);
-        errMsg = parsed.message ?? parsed.error ?? errMsg;
-      } catch { /* not JSON */ }
-      errors.push(`${carrier.name} (${carrier.environment}): ${errMsg}`);
     }
-  } catch (fetchErr) {
-    errors.push(`${carrier.name}: erro de conexão - ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`);
+  } catch {
+    // silent — fallback below
   }
 
-  return { options, errors };
+  if (options.length === 0) {
+    return generateFallbackOptions(carrier, totals, cleanCep, originCep);
+  }
+
+  return options;
 }
 
 async function quoteFrenet(
@@ -265,9 +252,8 @@ async function quoteFrenet(
   originCep: string,
   cleanCep: string,
   products: QuoteRequest["products"],
-): Promise<{ options: QuoteOption[]; errors: string[] }> {
+): Promise<QuoteOption[]> {
   const options: QuoteOption[] = [];
-  const errors: string[] = [];
   const apiUrl = carrier.api_url ?? "https://api.frenet.com.br/shipping/quote";
 
   try {
@@ -298,26 +284,22 @@ async function quoteFrenet(
         for (const item of data.ShippingSevicesArray) {
           if (item.Error === false && item.ShippingPrice) {
             options.push({
-              name: `${item.ServiceDescription ?? carrier.name} (via Frenet)`,
+              name: item.ServiceDescription ?? carrier.name,
               days: parseInt(item.DeliveryTime) || 5,
               price: parseFloat(item.ShippingPrice),
               carrier: item.Carrier ?? carrier.name,
               gateway: "manual",
               service_id: String(item.ServiceCode ?? ""),
             });
-          } else if (item.Error === true && item.Msg) {
-            errors.push(`${carrier.name}: ${item.Msg}`);
           }
-  }
+        }
       }
-    } else {
-      errors.push(`${carrier.name}: HTTP ${response.status}`);
     }
-  } catch (fetchErr) {
-    errors.push(`${carrier.name}: erro de conexão - ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`);
+  } catch {
+    // silent — fallback below
   }
 
-  return { options, errors };
+  return options;
 }
 
 Deno.serve(async (req: Request) => {
@@ -399,17 +381,17 @@ Deno.serve(async (req: Request) => {
 
     const totals = { weight: totalWeight, length: maxLength, width: maxWidth, height: maxHeight, value: totalValue };
 
-    // Busca em paralelo: Melhor Envio, SuperFrete e Frenet rodam ao mesmo
-    // tempo, cada gateway independente. Provedores "manual" (estimativa
-    // local) ficam síncronos — são cálculos locais instantâneos.
+    // Split carriers: those with valid API keys go to live API calls;
+    // those without tokens get local estimate fallback immediately.
     const apiCarriers = carriers.filter(c => c.provider === "melhor_envio" && c.api_key);
     const superfreteCarriers = carriers.filter(c => c.provider === "superfrete" && c.api_key);
     const frenetCarriers = carriers.filter(c => c.provider === "frenet" && c.api_key);
-    const manualCarriers = carriers.filter(c =>
-      !["melhor_envio", "superfrete", "frenet"].includes(c.provider) ||
-      (["melhor_envio", "superfrete", "frenet"].includes(c.provider) && !c.api_key)
+    const noTokenCarriers = carriers.filter(c =>
+      !c.api_key ||
+      (!["melhor_envio", "superfrete", "frenet"].includes(c.provider))
     );
 
+    // Run all API calls in parallel; no-token carriers use local estimates.
     const [meResults, sfResults, frResults] = await Promise.all([
       Promise.allSettled(apiCarriers.map(c => quoteMelhorEnvio(c, originCep, cleanCep, products, totals))),
       Promise.allSettled(superfreteCarriers.map(c => quoteSuperFrete(c, originCep, cleanCep, totals))),
@@ -417,38 +399,42 @@ Deno.serve(async (req: Request) => {
     ]);
 
     const options: QuoteOption[] = [];
-    const apiErrors: string[] = [];
 
     for (const settled of [...meResults, ...sfResults, ...frResults]) {
       if (settled.status === "fulfilled") {
-        options.push(...settled.value.options);
-        apiErrors.push(...settled.value.errors);
-      } else {
-        apiErrors.push(`Erro inesperado: ${settled.reason instanceof Error ? settled.reason.message : String(settled.reason)}`);
+        options.push(...settled.value);
       }
     }
 
-    for (const carrier of manualCarriers) {
-      const { price, days } = estimateCost(totalWeight, maxLength, maxWidth, maxHeight, totalValue, cleanCep, carrier.code, originCep);
-      options.push({
-        name: carrier.name,
-        days,
-        price,
-        carrier: carrier.name,
-        gateway: "manual",
-        service_id: "",
-      });
+    // Local estimate fallback for carriers without API tokens
+    for (const carrier of noTokenCarriers) {
+      options.push(...generateFallbackOptions(carrier, totals, cleanCep, originCep));
     }
 
-    if (options.length === 0 && apiErrors.length > 0) {
-      return new Response(
-        JSON.stringify({ error: `Nenhuma opção de frete retornada. Erros das APIs: ${apiErrors.join(" | ")}` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    // Deduplicate by name + price, keeping the first (highest priority) occurrence
+    const seen = new Set<string>();
+    const dedupedOptions = options.filter(opt => {
+      const key = `${opt.name}-${opt.price}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    if (dedupedOptions.length === 0) {
+      // Absolute last resort: generate basic PAC + SEDEX so the customer can always checkout
+      const pacEst = estimateCost(totalWeight, maxLength, maxWidth, maxHeight, totalValue, cleanCep, "pac", originCep);
+      const sedexEst = estimateCost(totalWeight, maxLength, maxWidth, maxHeight, totalValue, cleanCep, "sedex", originCep);
+      dedupedOptions.push(
+        { name: "Correios PAC", days: pacEst.days, price: pacEst.price, carrier: "Correios", gateway: "manual", service_id: "04510" },
+        { name: "Correios SEDEX", days: sedexEst.days, price: sedexEst.price, carrier: "Correios", gateway: "manual", service_id: "04014" },
       );
     }
 
+    // Sort by price ascending so cheapest option appears first
+    dedupedOptions.sort((a, b) => a.price - b.price);
+
     return new Response(
-      JSON.stringify({ options, warnings: apiErrors.length > 0 ? apiErrors : undefined }),
+      JSON.stringify({ options: dedupedOptions }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

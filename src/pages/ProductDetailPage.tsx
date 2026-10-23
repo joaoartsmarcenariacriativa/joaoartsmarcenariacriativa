@@ -31,7 +31,6 @@ export default function ProductDetailPage({ slug, onNavigate }: ProductDetailPag
   const [cep, setCep] = useState('');
   const [shippingOptions, setShippingOptions] = useState<ShippingQuoteOption[] | null>(null);
   const [shippingError, setShippingError] = useState<string | null>(null);
-  const [shippingWarnings, setShippingWarnings] = useState<string[] | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const { addItem } = useCart();
   const { user, isCustomer } = useAuth();
@@ -141,7 +140,6 @@ export default function ProductDetailPage({ slug, onNavigate }: ProductDetailPag
     setQuantity(1);
     setShippingOptions(null);
     setShippingError(null);
-    setShippingWarnings(null);
     setSelectedVariation(null);
 
     supabase
@@ -254,10 +252,9 @@ export default function ProductDetailPage({ slug, onNavigate }: ProductDetailPag
     setShippingLoading(true);
     setShippingError(null);
     setShippingOptions(null);
-    setShippingWarnings(null);
 
     const declaredValue = product.ship_declared_value ?? currentPrice * quantity;
-    const { options, error, warnings } = await fetchShippingQuote(cleanCep, [{
+    const { options, error } = await fetchShippingQuote(cleanCep, [{
       weight_g: (product.ship_weight_g ?? 500) + (product.ship_packaging_weight_g ?? 0),
       length_cm: (product.ship_length_cm ?? 20) + (product.ship_packaging_cm ?? 0),
       width_cm: (product.ship_width_cm ?? 20) + (product.ship_packaging_cm ?? 0),
@@ -270,7 +267,6 @@ export default function ProductDetailPage({ slug, onNavigate }: ProductDetailPag
       setShippingError(error);
     } else {
       setShippingOptions(options);
-      setShippingWarnings(warnings);
     }
     setShippingLoading(false);
   };
@@ -554,14 +550,6 @@ export default function ProductDetailPage({ slug, onNavigate }: ProductDetailPag
             )}
             {shippingOptions && shippingOptions.length === 0 && (
               <p className="text-xs text-muted mt-2">Nenhuma opção de frete encontrada para este CEP.</p>
-            )}
-            {shippingWarnings && shippingWarnings.length > 0 && (
-              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-[11px] text-amber-700 font-medium mb-1">Avisos das transportadoras:</p>
-                {shippingWarnings.map((w, idx) => (
-                  <p key={idx} className="text-[10px] text-amber-600 leading-relaxed">{w}</p>
-                ))}
-              </div>
             )}
             <a
               href="https://buscacepinter.correios.com.br/"

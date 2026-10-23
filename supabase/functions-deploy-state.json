@@ -9,13 +9,13 @@
       "hasChanged": false,
       "hash": "d99750841d246a11629d0d6b632defff16c502a154a52b33615ba2d865591bf7"
     },
-    "shipping-quote": {
-      "hasChanged": false,
-      "hash": "2452e98a98e013f742eccd8d8eac63183c998c93a0798f2926d6739b1f3614a6"
-    },
     "send-launch-broadcast": {
       "hasChanged": false,
       "hash": "6c9973cf712391372d145299eebba2e4f0e5bd2bb294ebbcc514f3be4e9dba2b"
+    },
+    "shipping-quote": {
+      "hasChanged": false,
+      "hash": "901641bb06ae58b2bc05e0394ec544e0a34099ba56a211c2252dfb4ba56abc9e"
     }
   }
 }
