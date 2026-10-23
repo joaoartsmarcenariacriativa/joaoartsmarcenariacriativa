@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { StoreSettingsProvider } from '@/context/StoreSettingsContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import CartDrawer from '@/components/CartDrawer';
@@ -225,12 +226,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <StoreSettingsProvider>
-        <CartProvider>
-          <AppContent />
-        </CartProvider>
-      </StoreSettingsProvider>
-    </AuthProvider>
+    <ErrorBoundary onNavigate={(path) => window.location.assign(path)}>
+      <AuthProvider>
+        <StoreSettingsProvider>
+          <CartProvider>
+            <AppContent />
+          </CartProvider>
+        </StoreSettingsProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
