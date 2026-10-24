@@ -70,7 +70,7 @@ async function tryBuyLabel(
           "User-Agent": "Joao-Arts-Loja (contato@joaoarts.com.br)",
         },
         body: JSON.stringify({
-          orders: [order.order_number],
+          orders: [order.id],
           to: {
             name: order.customer_name,
             postal_code: cleanCep,
@@ -107,7 +107,7 @@ async function tryBuyLabel(
           "Authorization": `Bearer ${carrier.api_key}`,
         },
         body: JSON.stringify({
-          order_number: order.order_number,
+          order_number: order.id,
           to: {
             name: order.customer_name,
             postal_code: cleanCep,
