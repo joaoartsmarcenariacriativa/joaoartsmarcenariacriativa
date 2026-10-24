@@ -183,8 +183,8 @@ function AppContent() {
     );
   }
 
-  // Checkout return (Mercado Pago callback)
-  if (pathname === '/pedido-confirmado') {
+  // Checkout return (Mercado Pago callback) — handles multiple URL aliases
+  if (pathname === '/pedido-confirmado' || pathname === '/order-success' || pathname === '/order-confirmation' || pathname === '/order-pending' || pathname === '/order-failure') {
     return (
       <div className="min-h-screen bg-cream flex flex-col">
         <Header onNavigate={navigate} currentPath={pathname} />

@@ -107,7 +107,7 @@ async function tryBuyLabel(
           "Authorization": `Bearer ${carrier.api_key}`,
         },
         body: JSON.stringify({
-          order_number: order.id,
+          orders: [order.id],
           to: {
             name: order.customer_name,
             postal_code: cleanCep,
