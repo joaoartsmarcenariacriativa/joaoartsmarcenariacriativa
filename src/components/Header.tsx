@@ -65,7 +65,7 @@ export default function Header({ onNavigate, currentPath }: HeaderProps) {
               className="flex items-center gap-3 flex-shrink-0"
             >
               <img 
-  src="/src/componentes/LOGO SUPERIOR.png" 
+  src="LOGO SUPERIOR.png" 
   alt={storeName} 
   className="w-10 h-10 rounded-lg object-contain" 
 />
