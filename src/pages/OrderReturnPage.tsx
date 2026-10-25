@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { Check, Loader2, X, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatBRL } from '@/lib/format';
+import { useCart } from '@/context/CartContext';
 
 interface OrderReturnPageProps {
   onNavigate: (path: string) => void;
 }
 
 export default function OrderReturnPage({ onNavigate }: OrderReturnPageProps) {
+  const { clearCart } = useCart();
   const [status, setStatus] = useState<'success' | 'pending' | 'failure' | 'loading'>('loading');
   const [order, setOrder] = useState<{ order_number: string; total: number; customer_name: string } | null>(null);
 
@@ -35,6 +37,7 @@ export default function OrderReturnPage({ onNavigate }: OrderReturnPageProps) {
 
       if (paymentStatus === 'success') {
         setStatus('success');
+        clearCart();
       } else if (paymentStatus === 'pending') {
         setStatus('pending');
       } else {

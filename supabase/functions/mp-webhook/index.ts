@@ -47,7 +47,7 @@ async function tryBuyLabel(
     shipping_service_id: string | null;
   },
   originCep: string,
-): Promise<{ trackingCode?: string; error?: string }> {
+): Promise<{ trackingCode?: string; labelUrl?: string; error?: string }> {
   if (!carrier.api_key) {
     return { error: "Transportadora sem API key configurada" };
   }
@@ -85,7 +85,8 @@ async function tryBuyLabel(
       if (resp.ok) {
         const data = await resp.json();
         const tracking = data.tracking ?? data.protocol ?? data.id;
-        if (tracking) return { trackingCode: String(tracking) };
+        const labelUrl = data.url ?? data.pdf_url ?? data.label_url ?? null;
+        if (tracking) return { trackingCode: String(tracking), labelUrl: labelUrl ?? undefined };
         return { error: "Resposta sem código de rastreio" };
       }
       const errBody = await resp.text().catch(() => "");
@@ -123,7 +124,8 @@ async function tryBuyLabel(
       if (resp.ok) {
         const data = await resp.json();
         const tracking = data.tracking_number ?? data.tracking ?? data.id;
-        if (tracking) return { trackingCode: String(tracking) };
+        const labelUrl = data.url ?? data.pdf_url ?? data.label_url ?? null;
+        if (tracking) return { trackingCode: String(tracking), labelUrl: labelUrl ?? undefined };
         return { error: "Resposta sem código de rastreio" };
       }
       const errBody = await resp.text().catch(() => "");
@@ -254,56 +256,72 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", order.id);
 
-      // Tenta compra automática de etiqueta na transportadora escolhida
-      const originCep = (s.origin_cep ?? "").replace(/\D/g, "");
-      const carrierName = order.shipping_carrier_name;
+      // Tenta compra automática de etiqueta na transportadora escolhida.
+      // Falhas aqui (falta de saldo, API fora, etc.) NUNCA interrompem o
+      // fluxo do pedido — o cliente continua vendo o comprovante de pagamento
+      // aprovado. O pedido fica marcado para emissão manual de etiqueta.
+      try {
+        const originCep = (s.origin_cep ?? "").replace(/\D/g, "");
+        const carrierName = order.shipping_carrier_name;
 
-      if (carrierName && originCep.length === 8) {
-        let carrierQuery = supabase
-          .from("shipping_carriers")
-          .select("*")
-          .eq("enabled", true)
-          .limit(1);
+        if (carrierName && originCep.length === 8) {
+          let carrierQuery = supabase
+            .from("shipping_carriers")
+            .select("*")
+            .eq("enabled", true)
+            .limit(1);
 
-        if (order.shipping_gateway === "melhorenvio") {
-          carrierQuery = carrierQuery.eq("provider", "melhor_envio");
-        } else if (order.shipping_gateway === "superfrete") {
-          carrierQuery = carrierQuery.eq("provider", "superfrete");
-        } else {
-          carrierQuery = carrierQuery.or(`name.eq.${carrierName},code.eq.${carrierName}`);
-        }
-
-        const { data: carrierRow } = await carrierQuery.maybeSingle();
-
-        const carrier = carrierRow as CarrierRow | null;
-
-        if (carrier?.api_key) {
-          const result = await tryBuyLabel(carrier, order, originCep);
-
-          if (result.trackingCode) {
-            // Sucesso: etiqueta comprada, status → enviado
-            await supabase
-              .from("orders")
-              .update({
-                tracking_code: result.trackingCode,
-                status: "enviado",
-                manual_label_required: false,
-                label_purchase_error: null,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", order.id);
+          if (order.shipping_gateway === "melhorenvio") {
+            carrierQuery = carrierQuery.eq("provider", "melhor_envio");
+          } else if (order.shipping_gateway === "superfrete") {
+            carrierQuery = carrierQuery.eq("provider", "superfrete");
           } else {
-            // Falha (ex.: falta de saldo): mantém processamento, marca manual
-            await supabase
-              .from("orders")
-              .update({
-                manual_label_required: true,
-                label_purchase_error: result.error ?? "Erro desconhecido",
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", order.id);
+            carrierQuery = carrierQuery.or(`name.eq.${carrierName},code.eq.${carrierName}`);
+          }
+
+          const { data: carrierRow } = await carrierQuery.maybeSingle();
+
+          const carrier = carrierRow as CarrierRow | null;
+
+          if (carrier?.api_key) {
+            const result = await tryBuyLabel(carrier, order, originCep);
+
+            if (result.trackingCode) {
+              // Sucesso: etiqueta comprada, status → enviado
+              await supabase
+                .from("orders")
+                .update({
+                  tracking_code: result.trackingCode,
+                  label_url: result.labelUrl ?? null,
+                  status: "enviado",
+                  manual_label_required: false,
+                  label_purchase_error: null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", order.id);
+            } else {
+              // Falha (ex.: falta de saldo): mantém processamento, marca manual
+              await supabase
+                .from("orders")
+                .update({
+                  manual_label_required: true,
+                  label_purchase_error: result.error ?? "Erro desconhecido",
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", order.id);
+            }
           }
         }
+      } catch (labelErr) {
+        // Qualquer erro inesperado na compra de etiqueta não quebra o webhook
+        await supabase
+          .from("orders")
+          .update({
+            manual_label_required: true,
+            label_purchase_error: labelErr instanceof Error ? labelErr.message : String(labelErr),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", order.id);
       }
 
       return new Response(

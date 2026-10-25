@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Package, Printer, X, Eye, Kanban, Table as TableIcon, Truck, CheckCircle2, XCircle, Clock, PackageCheck, AlertTriangle, Download, RotateCcw } from 'lucide-react';
+import { Search, Package, Printer, X, Eye, Kanban, Table as TableIcon, Truck, CheckCircle2, XCircle, Clock, PackageCheck, AlertTriangle, Download, RotateCcw, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Order, OrderItem, OrderStatus } from '@/types';
 import { formatBRL } from '@/lib/format';
@@ -593,6 +593,16 @@ export default function AdminOrders() {
                     className="text-xs text-wood hover:underline mt-1 inline-block"
                   >
                     Abrir rastreio em nova aba
+                  </a>
+                )}
+                {selectedOrder.label_url && (
+                  <a
+                    href={selectedOrder.label_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-700 hover:underline mt-1 ml-3 inline-flex items-center gap-1"
+                  >
+                    <FileText className="w-3 h-3" /> Abrir etiqueta (PDF)
                   </a>
                 )}
               </div>

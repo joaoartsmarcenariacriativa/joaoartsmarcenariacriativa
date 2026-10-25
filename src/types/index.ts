@@ -107,6 +107,7 @@ export interface Order {
   payment_method: string | null;
   payment_status: string | null;
   tracking_code: string | null;
+  label_url: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
