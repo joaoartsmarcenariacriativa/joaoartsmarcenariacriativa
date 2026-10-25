@@ -64,11 +64,17 @@ export default function Header({ onNavigate, currentPath }: HeaderProps) {
               onClick={() => handleNavigate('/')}
               className="flex items-center gap-3 flex-shrink-0"
             >
-              <img 
-  src="LOGO SUPERIOR.png" 
-  alt={storeName} 
-  className="w-10 h-10 rounded-lg object-contain" 
-/>
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={storeName}
+                  className="w-10 h-10 rounded-lg border border-rim object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-wood rounded-lg flex items-center justify-center">
+                  <Hammer className="w-5 h-5 text-cream" />
+                </div>
+              )}
 
               <div className="hidden sm:block leading-tight">
                 <p className="font-serif text-xl font-medium text-espresso">{storeName}</p>
