@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, Package, ShoppingBag, LogOut, Hammer, Menu, X, Image, Tag, Settings, FileText, Truck, BookOpen, Megaphone, Users, Star, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, LogOut, Hammer, Menu, X, Image, Tag, Settings, FileText, Truck, BookOpen, Megaphone, Users, Star, CreditCard, Ticket, Wallet, Handshake } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AdminDashboard from './admin/AdminDashboard';
 import AdminProducts from './admin/AdminProducts';
@@ -14,8 +14,9 @@ import AdminAutomations from './admin/AdminAutomations';
 import AdminContacts from './admin/AdminContacts';
 import AdminReviews from './admin/AdminReviews';
 import AdminPayments from './admin/AdminPayments';
+import AdminCommerce from './admin/AdminCommerce';
 
-type AdminTab = 'dashboard' | 'products' | 'orders' | 'ebooks' | 'reviews' | 'banners' | 'categories' | 'settings' | 'shipping' | 'payments' | 'content' | 'automations' | 'contacts';
+type AdminTab = 'dashboard' | 'products' | 'orders' | 'ebooks' | 'reviews' | 'banners' | 'categories' | 'settings' | 'shipping' | 'payments' | 'content' | 'automations' | 'contacts' | 'coupons' | 'gateways' | 'partners';
 
 interface AdminPanelProps {
   onNavigate: (path: string) => void;
@@ -36,6 +37,9 @@ export default function AdminPanel({ onNavigate }: AdminPanelProps) {
     { id: 'categories' as const, label: 'Categorias', icon: Tag },
     { id: 'shipping' as const, label: 'Transportadoras', icon: Truck },
     { id: 'payments' as const, label: 'Pagamentos', icon: CreditCard },
+    { id: 'coupons' as const, label: 'Cupons e Ofertas', icon: Ticket },
+    { id: 'gateways' as const, label: 'Gateways de Pagamento', icon: Wallet },
+    { id: 'partners' as const, label: 'Lojas Parceiras', icon: Handshake },
     { id: 'automations' as const, label: 'Automações', icon: Megaphone },
     { id: 'contacts' as const, label: 'Contatos', icon: Users },
     { id: 'settings' as const, label: 'Configurações', icon: Settings },
@@ -144,6 +148,9 @@ export default function AdminPanel({ onNavigate }: AdminPanelProps) {
           {tab === 'settings' && <AdminSettings />}
           {tab === 'shipping' && <AdminShipping />}
           {tab === 'payments' && <AdminPayments />}
+          {tab === 'coupons' && <AdminCommerce section="coupons" />}
+          {tab === 'gateways' && <AdminCommerce section="gateways" />}
+          {tab === 'partners' && <AdminCommerce section="partners" />}
           {tab === 'automations' && <AdminAutomations />}
           {tab === 'contacts' && <AdminContacts />}
           {tab === 'content' && <AdminContent />}

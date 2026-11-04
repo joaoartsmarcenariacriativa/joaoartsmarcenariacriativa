@@ -80,6 +80,43 @@ export interface Banner {
   active: boolean;
 }
 
+export type CouponDiscountType = 'percent' | 'fixed';
+export interface Coupon {
+  id: string;
+  code: string;
+  discount_type: CouponDiscountType;
+  discount_value: number;
+  min_order_value: number;
+  max_uses: number | null;
+  uses_count: number;
+  expires_at: string;
+  active: boolean;
+  description: string | null;
+  created_at: string;
+}
+
+export type GatewayStatus = 'ativo' | 'teste';
+export interface PaymentGateway {
+  id: string;
+  provider_name: string;
+  public_key: string | null;
+  status: GatewayStatus;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface PartnerStore {
+  id: string;
+  name: string;
+  url: string;
+  description: string | null;
+  logo_url: string | null;
+  category: string;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface OrderItem {
   id: string;
   order_id: string;
