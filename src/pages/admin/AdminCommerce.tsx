@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   AlertCircle,
+  CheckCircle2,
   ExternalLink,
   Eye,
   EyeOff,
@@ -9,12 +10,14 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Search,
   ShieldCheck,
   Store,
   Ticket,
   Trash2,
   Wallet,
   X,
+  Zap,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatBRL } from '@/lib/format';
@@ -353,12 +356,16 @@ function CouponForm({
   );
 }
 
+type CouponFilter = 'all' | 'active' | 'expired' | 'inactive';
+
 function Coupons() {
   const [items, setItems] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [open, setOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<CouponFilter>('all');
+  const [search, setSearch] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -371,6 +378,23 @@ function Coupons() {
     setLoadError(null);
     setItems((data ?? []) as Coupon[]);
   };
+
+  const isExpired = (expires_at: string) => new Date(expires_at) < new Date();
+
+  const filteredItems = items.filter(item => {
+    if (search && !item.code.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filter === 'active') return item.active && !isExpired(item.expires_at);
+    if (filter === 'expired') return isExpired(item.expires_at);
+    if (filter === 'inactive') return !item.active;
+    return true;
+  });
+
+  const filterButtons: { key: CouponFilter; label: string }[] = [
+    { key: 'all', label: 'Todos' },
+    { key: 'active', label: 'Ativos' },
+    { key: 'expired', label: 'Expirados' },
+    { key: 'inactive', label: 'Inativos' },
+  ];
 
   useEffect(() => {
     load();
@@ -407,9 +431,36 @@ function Coupons() {
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-wood" />
         </div>
-      ) : items.length === 0 ? (
-        <Empty text="Nenhum cupom cadastrado ainda. Clique em 'Criar Novo Cupom' para começar." />
       ) : (
+        <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {filterButtons.map(btn => (
+            <button
+              key={btn.key}
+              onClick={() => setFilter(btn.key)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                filter === btn.key
+                  ? 'bg-wood text-espresso'
+                  : 'bg-cream text-muted hover:bg-rim/40'
+              }`}
+            >
+              {btn.label}
+            </button>
+          ))}
+          <div className="relative ml-auto">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por código..."
+              className="w-40 rounded-full border border-rim bg-cream py-1.5 pl-7 pr-3 text-xs focus:border-wood focus:outline-none sm:w-52"
+            />
+          </div>
+        </div>
+        {filteredItems.length === 0 ? (
+          <Empty text="Nenhum cupom encontrado para este filtro." />
+        ) : (
         <div className="overflow-x-auto rounded-2xl border border-rim bg-paper">
           <table className="w-full min-w-[820px] text-sm">
             <thead className="bg-cream text-left text-[10px] uppercase tracking-[0.15em] text-muted">
@@ -424,7 +475,7 @@ function Coupons() {
               </tr>
             </thead>
             <tbody className="divide-y divide-rim">
-              {items.map(item => {
+              {filteredItems.map(item => {
                 const expired = new Date(item.expires_at) < new Date();
                 return (
                   <tr key={item.id} className="hover:bg-cream/50">
@@ -486,6 +537,8 @@ function Coupons() {
               })}
             </tbody>
           </table>
+        </div>
+        )}
         </div>
       )}
       {open && (
@@ -619,6 +672,42 @@ function Gateways() {
   const [editing, setEditing] = useState<PaymentGateway | null>(null);
   const [open, setOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; msg: string }>>({});
+
+  const testGateway = async (item: PaymentGateway) => {
+    setTestingId(item.id);
+    setTestResult(prev => ({ ...prev, [item.id]: { ok: false, msg: 'Testando...' } }));
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mp-checkout`;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      };
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'ping', provider: item.provider_name }),
+      });
+      if (response.ok || response.status === 400) {
+        setTestResult(prev => ({
+          ...prev,
+          [item.id]: { ok: true, msg: 'Conexão estabelecida com sucesso.' },
+        }));
+      } else {
+        setTestResult(prev => ({
+          ...prev,
+          [item.id]: { ok: false, msg: `Erro ${response.status}: sem resposta do servidor.` },
+        }));
+      }
+    } catch {
+      setTestResult(prev => ({
+        ...prev,
+        [item.id]: { ok: false, msg: 'Não foi possível conectar ao gateway.' },
+      }));
+    }
+    setTestingId(null);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -716,7 +805,34 @@ function Gateways() {
               >
                 {item.enabled ? 'Ligado' : 'Desligado'}
               </span>
+              {testResult[item.id] && (
+                <span
+                  className={`hidden items-center gap-1 text-xs sm:flex ${
+                    testResult[item.id].ok ? 'text-moss' : 'text-red-600'
+                  }`}
+                >
+                  {testResult[item.id].ok ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <AlertCircle className="h-3.5 w-3.5" />
+                  )}
+                  {testResult[item.id].msg}
+                </span>
+              )}
               <div className="flex gap-3">
+                <button
+                  aria-label="Testar conexão do gateway"
+                  onClick={() => testGateway(item)}
+                  disabled={testingId === item.id}
+                  title="Testar conexão"
+                  className="hover:text-espresso disabled:opacity-50"
+                >
+                  {testingId === item.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted" />
+                  ) : (
+                    <Zap className="h-4 w-4 text-muted" />
+                  )}
+                </button>
                 <button
                   aria-label="Editar gateway"
                   onClick={() => {
