@@ -890,17 +890,29 @@ function PartnerForm({
     logo: item?.logo_url ?? '',
     category: item?.category ?? 'Geral',
     active: item?.active ?? true,
+    slug: item?.slug ?? '',
+    adminEmail: item?.admin_email ?? '',
+    checkoutTestUrl: item?.checkout_test_url ?? '',
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const generateSlug = (name: string) =>
+    name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
   const save = async () => {
     const url = httpsUrl(form.url);
     const logo = form.logo.trim() ? httpsUrl(form.logo) : null;
+    const checkoutTest = form.checkoutTestUrl.trim() ? httpsUrl(form.checkoutTestUrl) : null;
     if (!form.name.trim()) return setError('Informe o nome da loja.');
     if (!url) return setError('Informe uma URL válida começando com https://');
     if (form.logo.trim() && !logo)
       return setError('A URL do logotipo deve começar com https://');
+    if (form.checkoutTestUrl.trim() && !checkoutTest)
+      return setError('A URL de teste de checkout deve começar com https://');
+
+    const slug = form.slug.trim() || generateSlug(form.name);
+    if (!/^[a-z0-9-]{2,80}$/.test(slug)) return setError('O slug deve ter apenas letras minúsculas, números e hifens.');
 
     setSaving(true);
     const payload = {
@@ -910,6 +922,9 @@ function PartnerForm({
       logo_url: logo,
       category: form.category.trim() || 'Geral',
       active: form.active,
+      slug,
+      admin_email: form.adminEmail.trim() || null,
+      checkout_test_url: checkoutTest,
     };
     const result = item
       ? await supabase.from('partner_stores').update(payload).eq('id', item.id)
@@ -946,6 +961,38 @@ function PartnerForm({
           onChange={e => setForm({ ...form, url: e.target.value })}
           placeholder="https://www.lojaparceira.com.br"
         />
+      </div>
+      <div>
+        <label className={labelClass}>Slug do Portal (URL amigável)</label>
+        <input
+          className={`${inputClass} font-mono`}
+          value={form.slug}
+          onChange={e => setForm({ ...form, slug: e.target.value })}
+          placeholder={generateSlug(form.name) || 'minha-loja'}
+        />
+        <p className="mt-1 text-[11px] text-muted">Endereço do portal: /parceiro/{form.slug || '...'}</p>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className={labelClass}>E-mail do Admin do Parceiro</label>
+          <input
+            className={inputClass}
+            type="email"
+            value={form.adminEmail}
+            onChange={e => setForm({ ...form, adminEmail: e.target.value })}
+            placeholder="parceiro@email.com"
+          />
+          <p className="mt-1 text-[11px] text-muted">O parceiro usa este e-mail para entrar no portal.</p>
+        </div>
+        <div>
+          <label className={labelClass}>URL de Teste de Checkout</label>
+          <input
+            className={inputClass}
+            value={form.checkoutTestUrl}
+            onChange={e => setForm({ ...form, checkoutTestUrl: e.target.value })}
+            placeholder="https://..."
+          />
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
@@ -1107,6 +1154,16 @@ function Partners() {
                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
                 {item.url}
               </a>
+              {item.slug && (
+                <a
+                  href={`/parceiro/${item.slug}`}
+                  onClick={(e) => { e.preventDefault(); window.open(`/parceiro/${item.slug}`, '_blank'); }}
+                  className="flex items-center gap-1 text-xs text-moss hover:underline"
+                >
+                  <ShieldCheck className="h-3 w-3 flex-shrink-0" />
+                  Portal do parceiro → /parceiro/{item.slug}
+                </a>
+              )}
               <div className="flex justify-end gap-3 border-t border-rim pt-2">
                 <button
                   aria-label="Editar parceiro"
