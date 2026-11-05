@@ -115,6 +115,41 @@ export interface PartnerStore {
   active: boolean;
   sort_order: number;
   created_at: string;
+  slug: string | null;
+  checkout_test_url: string | null;
+  admin_email: string | null;
+}
+
+export type PartnerRole = 'admin' | 'manager';
+
+export interface PartnerAccount {
+  id: string;
+  partner_store_id: string;
+  user_id: string;
+  role: PartnerRole;
+  created_at: string;
+}
+
+export interface PartnerShowcaseItem {
+  id: string;
+  partner_store_id: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  link_url: string | null;
+  price_label: string | null;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface PartnerAuditLog {
+  id: string;
+  partner_store_id: string;
+  actor_email: string;
+  action: string;
+  detail: string | null;
+  created_at: string;
 }
 
 export interface OrderItem {

@@ -20,6 +20,7 @@ import MemberAreaPage from '@/pages/MemberAreaPage';
 import MyOrdersPage from '@/pages/MyOrdersPage';
 import CustomerLogin from '@/pages/CustomerLogin';
 import MyAccountPage from '@/pages/MyAccountPage';
+import PartnerPortal from '@/pages/PartnerPortal';
 
 function AppContent() {
   const [path, setPath] = useState(window.location.pathname + window.location.search);
@@ -59,6 +60,12 @@ function AppContent() {
       return <AdminLogin onNavigate={navigate} />;
     }
     return <AdminPanel onNavigate={navigate} />;
+  }
+
+  // Partner portal
+  if (pathname.startsWith('/parceiro/')) {
+    const partnerSlug = pathname.split('/')[2];
+    return <PartnerPortal slug={partnerSlug} onNavigate={navigate} />;
   }
 
   // Policy routes
